@@ -1,0 +1,11 @@
+{
+	"reqId": "requestID",
+	"method": "get",
+	"url": "http://zmartify.com/test",
+	"params": "?kurt=true&ole=yes",
+	"body": {
+		"ole": "Peter",
+		"mar": "Marianne"
+	},
+	"contentType": "application/json"
+}
