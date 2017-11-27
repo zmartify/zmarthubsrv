@@ -5,11 +5,12 @@ package com.zmartify.hub.zmarthubsrv.service.nwm;
 
 import java.util.List;
 import java.util.Map;
-
+import org.freedesktop.NetworkManager;
 import org.freedesktop.Pair;
 import org.freedesktop.dbus.DBusInterface;
 import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
+import org.freedesktop.dbus.exceptions.DBusException;
 
 /**
  * @author Peter Kristensen
@@ -17,6 +18,8 @@ import org.freedesktop.dbus.Variant;
  */
 public interface INWMDevice {
 
+    NetworkManager.Device getDevice();
+    
     Map<String, Variant<?>> getLldpNeighbors();
 
     List<DBusInterface> getAvailableConnections();
@@ -29,7 +32,7 @@ public interface INWMDevice {
 
     boolean getNmPluginMissing();
 
-    boolean Real();
+    boolean getReal();
 
     DBusInterface getActiveConnection();
 
@@ -72,11 +75,11 @@ public interface INWMDevice {
     /**
      * @throws Exception
      */
-    void startup() throws Exception;
+    void startup(boolean withSigHandlers) throws DBusException;
 
     /**
      * @throws Exception
      */
-    void shutdown() throws Exception;
+    void shutdown() throws DBusException;
 
 }

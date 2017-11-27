@@ -57,16 +57,16 @@ public class NWMAccessPoint implements INWMAccessPoint {
 
             nwmAccessPoint = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, accessPointObjectPath,
                     AccessPoint.class);
-            log.info("Got accessPoint '{}'", nwmAccessPoint);
+            log.debug("Got accessPoint '{}'", nwmAccessPoint);
 
             nwmAccessPointProperties = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, accessPointObjectPath,
                     Properties.class);
-            log.info("Got accessPoint.Properties '{}'", nwmAccessPointProperties);
+            log.debug("Got accessPoint.Properties '{}'", nwmAccessPointProperties);
 
             nwmAccessPointSettings = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, accessPointObjectPath,
                     NetworkManager.Settings.class);
 
-            log.info("Got accessPoint.Settings '{}'", nwmAccessPointSettings);
+            log.debug("Got accessPoint.Settings '{}'", nwmAccessPointSettings);
 
         } catch (DBusException e) {
             log.error("Error constructing AccessPoint");
@@ -76,6 +76,17 @@ public class NWMAccessPoint implements INWMAccessPoint {
     @Override
     public void startup() throws Exception {
 
+        addChangedSignalHandler();
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+        nwmProvider.getDbusConnection().removeSigHandler(Properties.PropertiesChanged.class,
+                propertiesChangedSignalHandler);
+    }
+
+    private void addChangedSignalHandler() throws DBusException {
         propertiesChangedSignalHandler = new DBusSigHandler<Properties.PropertiesChanged>() {
             @Override
             public void handle(Properties.PropertiesChanged propertiesChanged) {
@@ -88,13 +99,6 @@ public class NWMAccessPoint implements INWMAccessPoint {
 
         log.debug("Added accessPoint sigHandler.PropertiesChanged ");
     }
-
-    @Override
-    public void shutdown() throws Exception {
-        nwmProvider.getDbusConnection().removeSigHandler(Properties.PropertiesChanged.class,
-                propertiesChangedSignalHandler);
-    }
-
     /**
      * Handle a DBus signal for properties changes on the device.
      * 
@@ -105,7 +109,7 @@ public class NWMAccessPoint implements INWMAccessPoint {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("Properties changed for AccessPoint " + propertiesChanged.getPropertiesChanged());
+                log.debug("Properties changed for AccessPoint " + propertiesChanged.getPropertiesChanged());
             }
         };
         new Thread(run).start();

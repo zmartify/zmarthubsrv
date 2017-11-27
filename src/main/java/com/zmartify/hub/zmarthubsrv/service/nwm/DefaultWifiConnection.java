@@ -5,7 +5,6 @@ package com.zmartify.hub.zmarthubsrv.service.nwm;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import org.freedesktop.dbus.Variant;
 
@@ -19,10 +18,6 @@ public class DefaultWifiConnection {
 
     public DefaultWifiConnection(String ssid, String password) {
         super();
-        Map<String, Variant<?>> sConnection = new HashMap<String, Variant<?>>();
-        sConnection.put("type", new Variant<String>("802-11-wireless"));
-        sConnection.put("uuid", new Variant<String>(UUID.randomUUID().toString()));
-        sConnection.put("id", new Variant<String>("Wifi " + ssid));
 
         Map<String, Variant<?>> sWifi = new HashMap<String, Variant<?>>();
         sWifi.put("ssid", new Variant<byte[]>(ssid.getBytes()));
@@ -39,7 +34,7 @@ public class DefaultWifiConnection {
         Map<String, Variant<?>> sIp6 = new HashMap<String, Variant<?>>();
         sIp6.put("method", new Variant<String>("ignore"));
 
-        connection.put("connection", sConnection);
+        // connection.put("connection", sConnection);
         connection.put("802-11-wireless", sWifi);
         connection.put("802-11-wireless-security", sWifiSecurity);
         connection.put("ipv4", sIp4);

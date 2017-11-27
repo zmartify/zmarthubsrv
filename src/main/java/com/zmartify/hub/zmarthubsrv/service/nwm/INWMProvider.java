@@ -14,7 +14,7 @@ import org.freedesktop.dbus.DBusInterface;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
-
+import org.freedesktop.dbus.exceptions.DBusException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -23,14 +23,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public interface INWMProvider {
 
-    public void startup() throws Exception;
+    public void startup(boolean withSigHandlers) throws Exception;
 
     public void shutdown() throws Exception;
+
+    boolean connectedWifi();
+
+    boolean disconnectWifi();
 
     public List<DBusInterface> getDevices();
 
     public List<DBusInterface> getAllDevices();
 
+    public List<ZmartAccessPoint> getAccessPoints();
+    
+    public List<ZmartAccessPoint> getActiveAccessPoints();
+    
     public boolean getNetworkingEnabled();
 
     public boolean getWirelessEnabled();
@@ -147,6 +155,12 @@ public interface INWMProvider {
      */
     public void saveHostname(String hostname);
 
+    public void ManageWifi() throws DBusException;
+    
+    public boolean getIfaceManaged(String iface) throws DBusException;
+
+    public boolean setIfaceManaged(String iface, boolean setManaged) throws DBusException;
+    
     /**
      * @return
      */

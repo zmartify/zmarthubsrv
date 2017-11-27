@@ -3,6 +3,7 @@
  */
 package com.zmartify.hub.zmarthubsrv;
 
+import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +12,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.zmartify.hub.zmarthubsrv.service.bluetooth.IBluezBluetoothDevice;
 import com.zmartify.hub.zmarthubsrv.service.bluetooth.bluez5.BluezBluetoothProvider;
+import com.zmartify.hub.zmarthubsrv.service.nwm.INWMConnectionActive;
 import com.zmartify.hub.zmarthubsrv.service.nwm.NWMConnection;
+import com.zmartify.hub.zmarthubsrv.service.nwm.NWMConnectionActive;
 import com.zmartify.hub.zmarthubsrv.service.nwm.NWMProvider;
 import com.zmartify.hub.zmarthubsrv.utils.VariantSerializer;
 
@@ -40,6 +43,7 @@ public class ZmartBTServerWorking {
 
         boolean BLUETOOTH = false;
         boolean WIRELESS = true;
+        boolean TESTCONNECTION = false;
 
         try {
             if (BLUETOOTH) {
@@ -51,48 +55,97 @@ public class ZmartBTServerWorking {
             }
 
             if (WIRELESS) {
-                nwmProvider.startup();
+                nwmProvider.startup(false);
+ 
+                Path activePath = null;
+                
+                log.info("Active Connections");
+                for (Path activeConn : nwmProvider.getActiveConnections()) {
+                    log.info("- connection: {}\n", activeConn.getPath());
+                    // NWMConnection connection = new NWMConnection(nwmProvider, activeConnection.getPath());
+                    try {
+                        INWMConnectionActive activeConnection = new NWMConnectionActive(nwmProvider, activeConn.getPath());
+                        log.info("Connection: \n{}", mapper.writerWithDefaultPrettyPrinter().writeValueAsString(activeConnection.getAll()));
+                        activePath = activeConnection.getSpecificObject();
+                    } catch (Exception e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
 
+                log.info("All Connections");
                 nwmProvider.listConnections().forEach(conn -> {
-                    NWMConnection connection = new NWMConnection(nwmProvider, conn.getObjectPath());
+                    log.info("- connection: {}", conn);
+                     NWMConnection connection = new NWMConnection(nwmProvider, conn.getObjectPath());
                     try {
-                        connection.startup();
+                         connection.startup();
                         log.info("Connection: \n{}", mapper.writerWithDefaultPrettyPrinter()
-                                .writeValueAsString(connection.getConnection().GetSettings()));
-                        Thread.sleep(2000);
+                               .writeValueAsString(connection.getConnection().GetSettings()));
                         connection.shutdown();
+                        connection.getConnection().Delete();
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
-
                 });
 
-                log.info("Active accessPoint: {}", nwmProvider.getWireless().getActiveAccessPoint());
+                // log.info("DevicesWireless:  {}", nwmProvider.getWifiDevices());
 
-                nwmProvider.getWireless().getAllAccessPoints().forEach(ap -> {
-                    try {
-                        log.info("*** -->>>>Trying to connect to new AccessPoint {}",
-                                nwmProvider.connectToAP(ap.getObjectPath(), "CarpeDiem"));
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
+                log.info("AccessPoints         {} :\n{}", activePath.getPath(), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(nwmProvider.getWireless().getAPs()));
+                log.info("Active AccessPoints  {} :\n{}", activePath.getPath(), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(nwmProvider.getWireless().getActiveAPs()));
+                
+                        /*
+                        if (nwmProvider.connectedWifi()) {
+                            log.info("Wireless is connected: {}");
+                        }
+                        log.info("Disconnecting wifi");
+                        nwmProvider.disconnectWifi();
+                        log.info("Wireless is connected: {}",nwmProvider.connectedWifi());
+                        */
+
+                if (TESTCONNECTION) {
+                    nwmProvider.listConnections().forEach(conn -> {
+                        NWMConnection connection = new NWMConnection(nwmProvider, conn.getObjectPath());
+                        try {
+                            // connection.startup();
+                            log.info("Connection: \n{}", mapper.writerWithDefaultPrettyPrinter()
+                                    .writeValueAsString(connection.getConnection().GetSettings()));
+                            // Thread.sleep(2000);
+                            // connection.shutdown();
+                        } catch (Exception e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                    });
+                }
+
+                if (TESTCONNECTION) {
                     log.info("Active accessPoint: {}", nwmProvider.getWireless().getActiveAccessPoint());
-                });
+                 
+                    
+                    nwmProvider.getWireless().getAllAccessPoints().forEach(ap -> {
+                        try {
+                            log.info("*** -->>>>Trying to connect to new AccessPoint {}",
+                                    nwmProvider.connectToAP(ap.getObjectPath(), "CarpeDiem"));
+                        } catch (Exception e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                        log.info("Active accessPoint: {}", nwmProvider.getWireless().getActiveAccessPoint());
+                    });
 
-                nwmProvider.getWireless().getAllAccessPoints().forEach(ap -> {
-                    try {
-                        log.info("*** -->>>>Trying to connect to new AccessPoint wrong password {}",
-                                nwmProvider.connectToAP(ap.getObjectPath(), "CarpeDied"));
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                });
+                    nwmProvider.getWireless().getAllAccessPoints().forEach(ap -> {
+                        try {
+                            log.info("*** -->>>>Trying to connect to new AccessPoint wrong password {}",
+                                    nwmProvider.connectToAP(ap.getObjectPath(), "CarpeDied"));
+                        } catch (Exception e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                    });
 
-                log.info("Active accessPoint: {}", nwmProvider.getWireless().getActiveAccessPoint());
-
+                    log.info("Active accessPoint: {}", nwmProvider.getWireless().getActiveAccessPoint());
+                }
             }
 
             if (BLUETOOTH) {

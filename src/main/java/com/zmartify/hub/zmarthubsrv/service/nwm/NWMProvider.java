@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.zmartify.hub.zmarthubsrv.service.nwm.NWMClass.NMDeviceState;
 import com.zmartify.hub.zmarthubsrv.service.nwm.NWMClass.NMDeviceType;
 import com.zmartify.hub.zmarthubsrv.utils.VariantSerializer;
 
@@ -55,6 +56,9 @@ public class NWMProvider implements INWMProvider {
 
     private NetworkManager.Settings nwmSettings;
 
+    // Deviceholder for default Wifi Device
+    private INWMDevice nwmDevice = null;
+
     private INWMDeviceWireless nwmWireless = null;
 
     private ObjectMapper jsonMapper;
@@ -73,6 +77,12 @@ public class NWMProvider implements INWMProvider {
      */
     private String nwmDbusBusName;
 
+    /*
+     * Various flags 
+     */
+    private boolean withSigHandlers = false;
+    private boolean running = false;
+
     public NWMProvider() {
         jsonMapper = new ObjectMapper();
         SimpleModule module = new SimpleModule();
@@ -81,7 +91,13 @@ public class NWMProvider implements INWMProvider {
     }
 
     @Override
-    public void startup() throws DBusException {
+    public void startup(boolean withSigHandlers) throws DBusException {
+
+        // If called when already running, shutdown first
+        if (running)
+            shutdown();
+
+        this.withSigHandlers = withSigHandlers;
 
         dbusConnection = DBusConnection.getConnection(DBusConnection.SYSTEM);
 
@@ -105,6 +121,57 @@ public class NWMProvider implements INWMProvider {
         nwmSettings = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, "/org/freedesktop/NetworkManager/Settings",
                 NetworkManager.Settings.class);
 
+        // Add signal handlers
+        if (withSigHandlers)
+            addSigHandlers();
+
+        /*
+         * Loop through devices and set up the wireless Device
+         */
+        for (DBusInterface device : getAllDevices()) {
+            Properties deviceProperties = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, device.getObjectPath(),
+                    Properties.class);
+            Variant<UInt32> deviceType = deviceProperties.Get(NWM_DEVICE_INTERFACE, "DeviceType");
+
+            if (NMDeviceType.NM_DEVICE_TYPE_WIFI.equals(deviceType.getValue())) {
+                nwmWireless = new NWMDeviceWireless(this, device.getObjectPath());
+                nwmDevice = new NWMDevice(this, device.getObjectPath());
+                nwmDevice.startup(false);
+                nwmWireless.startup();
+                break;
+            }
+        }
+
+        if (nwmWireless == null) {
+            log.error("No wireless device found");
+        }
+
+        running = true;
+        log.debug("NWM Provider started.");
+    }
+
+    @Override
+    public void shutdown() throws DBusException {
+        if (nwmWireless != null) {
+            nwmWireless.shutdown();
+            nwmWireless = null;
+        }
+
+        if (nwmDevice != null) {
+            nwmDevice.shutdown();
+            nwmDevice = null;
+        }
+
+        if (withSigHandlers)
+            removeSigHandlers();
+
+        dbusConnection.disconnect();
+        running = false;
+        log.debug("NWM Provider shutdown.");
+    }
+
+    private void addSigHandlers() throws DBusException {
+
         interfacesAddedSignalHandler = new DBusSigHandler<ObjectManager.InterfacesAdded>() {
             @Override
             public void handle(ObjectManager.InterfacesAdded signal) {
@@ -126,6 +193,19 @@ public class NWMProvider implements INWMProvider {
         dbusConnection.addSigHandler(ObjectManager.InterfacesRemoved.class, nwmDbusBusName, nwmObjectManager,
                 interfacesRemovedSignalHandler);
 
+    }
+
+    private void removeSigHandlers() throws DBusException {
+        dbusConnection.removeSigHandler(ObjectManager.InterfacesAdded.class, interfacesAddedSignalHandler);
+        dbusConnection.removeSigHandler(ObjectManager.InterfacesRemoved.class, interfacesRemovedSignalHandler);
+    }
+
+    public List<DBusInterface> listAccessPoints() throws Exception {
+        return nwmWireless.getDeviceWireless().GetAllAccessPoints();
+    }
+
+    public List<String> getWifiDevices() throws Exception {
+        List<String> wifiDevices = new ArrayList<String>();
         /*
          * Loop through devices and set up the wireless Device
          */
@@ -135,35 +215,10 @@ public class NWMProvider implements INWMProvider {
             Variant<UInt32> deviceType = deviceProperties.Get(NWM_DEVICE_INTERFACE, "DeviceType");
 
             if (NMDeviceType.NM_DEVICE_TYPE_WIFI.equals(deviceType.getValue())) {
-                nwmWireless = new NWMDeviceWireless(this, device.getObjectPath());
-                nwmWireless.startup();
-                break;
+                wifiDevices.add(device.getObjectPath());
             }
         }
-
-        if (nwmWireless == null) {
-            log.error("No wireless device found");
-        }
-
-        log.debug("NWM Provider started.");
-    }
-
-    @Override
-    public void shutdown() throws DBusException {
-        if (nwmWireless != null) {
-            nwmWireless.shutdown();
-            nwmWireless = null;
-        }
-
-        dbusConnection.removeSigHandler(ObjectManager.InterfacesAdded.class, interfacesAddedSignalHandler);
-        dbusConnection.removeSigHandler(ObjectManager.InterfacesRemoved.class, interfacesRemovedSignalHandler);
-
-        dbusConnection.disconnect();
-        log.debug("NWM Provider shutdown.");
-    }
-
-    public List<DBusInterface> listAccessPoints() throws Exception {
-        return nwmWireless.getDeviceWireless().GetAllAccessPoints();
+        return wifiDevices;
     }
 
     @Override
@@ -234,6 +289,35 @@ public class NWMProvider implements INWMProvider {
 
     public void printManagedObjects() {
         log.info(nwmObjectManager.GetManagedObjects().toString());
+    }
+
+    /*
+     * Checks if any passwd wifi devices are connected
+     * 
+     * @return boolean
+     */
+    @Override
+    public boolean connectedWifi() {
+        return NMDeviceState.NM_DEVICE_STATE_ACTIVATED.equals(nwmDevice.getState().intValue());
+    }
+
+    /**
+     * Disconnecs every instance passed. Return show number of disconnect calls made
+     */
+    @Override
+    public boolean disconnectWifi() {
+        nwmDevice.getDevice().Disconnect();
+        return true;
+    }
+
+    @Override
+    public List<ZmartAccessPoint> getAccessPoints() {
+        return nwmWireless.getAPs();
+    }
+
+    @Override
+    public List<ZmartAccessPoint> getActiveAccessPoints() {
+        return nwmWireless.getActiveAPs();
     }
 
     @Override
@@ -535,18 +619,80 @@ public class NWMProvider implements INWMProvider {
 
     @Override
     public Pair<DBusInterface, DBusInterface> connectToAP(String objectPath, String password) throws Exception {
-        log.info("We got a request for new AccessPoint");
+        log.info("***** We got a request for new AccessPoint");
         NWMAccessPoint accessPoint = new NWMAccessPoint(this, objectPath);
         accessPoint.startup();
         String ssid = accessPoint.getSsidAsString();
-        log.info("Ssid: {} - Password {}", ssid, password);
+        log.info("***** Ssid: {} - Password {}", ssid, password);
         DefaultWifiConnection connection = new DefaultWifiConnection(ssid, password);
 
         Pair<DBusInterface, DBusInterface> result = nwmNetworkManager.AddAndActivateConnection(connection.get(),
                 nwmWireless.getDeviceWireless(), accessPoint.getAccessPoint());
         accessPoint.shutdown();
-        Thread.sleep(20000);
-        return result;
+        
+        // Wait up till 20 seconds for connection
+        int maxWait = 20;
+        while (maxWait > 0) {
+            // Find any Active Wifi connections
+            try {
+            for (Path activeConn : getActiveConnections()) {
+                INWMConnectionActive activeConnection = new NWMConnectionActive(this, activeConn.getPath());
+                if (activeConnection.getSpecificObject().getPath().equals(objectPath)) {
+                    if (connectedWifi()) {
+                        return result; 
+                    }
+                }
+            }
+
+            // If not connected, wait another second and check again
+            Thread.sleep(1000);
+            } catch (Exception e) {
+                log.error("Exception {}", e.getMessage());
+            }
+            maxWait = maxWait - 1;
+        }
+
+
+        return null;
     }
 
+    @Override
+    public void ManageWifi() throws DBusException {
+        setIfaceManaged("wlan0", true);
+    }
+
+    @Override
+    public boolean getIfaceManaged(String iface) throws DBusException {
+        String objPath = getNetWorkManager().GetDeviceByIpIface(iface).getObjectPath();
+        Properties deviceProperties = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, objPath, Properties.class);
+        Variant<Boolean> managed = deviceProperties.Get(NWM_DEVICE_INTERFACE, NWM_PROPERTY_MANAGED);
+        return managed.getValue();
+    }
+
+    @Override
+    public boolean setIfaceManaged(String iface, boolean setManaged) throws DBusException {
+        String objPath = getNetWorkManager().GetDeviceByIpIface(iface).getObjectPath();
+        Properties deviceProperties = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, objPath, Properties.class);
+        Variant<Boolean> managed = deviceProperties.Get(NWM_DEVICE_INTERFACE, NWM_PROPERTY_MANAGED);
+        if (setManaged == managed.getValue()) {
+            // if already in desired state -> nothing to do
+            return managed.getValue();
+        }
+
+        deviceProperties.Set(NWM_DEVICE_INTERFACE, NWM_PROPERTY_MANAGED, new Variant<Boolean>(setManaged));
+
+        // Loop until interface is in desired managed state or max iters reached
+        for (int i = 0; i < 60; i++) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                log.error("Sleep was interrupted");
+            }
+            managed = deviceProperties.Get(NWM_DEVICE_INTERFACE, NWM_PROPERTY_MANAGED);
+            if (managed.getValue() == setManaged)
+                return managed.getValue();
+        }
+
+        return managed.getValue();
+    }
 }

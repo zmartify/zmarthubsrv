@@ -6,7 +6,7 @@ package com.zmartify.hub.zmarthubsrv.hubclient;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Scanner;
 import org.eclipse.jetty.http.HttpStatus;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
@@ -21,6 +21,7 @@ import com.zmartify.hub.zmarthubsrv.bluetooth.Message;
 import com.zmartify.hub.zmarthubsrv.bluetooth.MessageListener;
 import com.zmartify.hub.zmarthubsrv.jettyclient.JettyRequest;
 import com.zmartify.hub.zmarthubsrv.jettyclient.JettyResponse;
+import com.zmartify.hub.zmarthubsrv.service.nwm.INWMConnection;
 import com.zmartify.hub.zmarthubsrv.service.nwm.INWMProvider;
 import com.zmartify.hub.zmarthubsrv.service.nwm.NWMConnection;
 import com.zmartify.hub.zmarthubsrv.service.nwm.NWMProvider;
@@ -58,7 +59,9 @@ public class HubClient implements IStandardClient {
     @Override
     public void startup() {
         try {
-            nwmProvider.startup();
+            nwmProvider.startup(false);
+            // Change hostname to ZmartHUB-'serialno'
+            nwmProvider.saveHostname("ZmartHUB-"+getMachineSerialNumber());
         } catch (Exception e) {
             log.error("Error trying to start NetworkManager Provider");
             return;
@@ -104,7 +107,7 @@ public class HubClient implements IStandardClient {
             jettyResponse.setStatusText(HttpStatus.getMessage(statusCode));
 
             Message m = new Message(jsonMapper.writeValueAsString(jettyResponse));
-            log.info("Sending message: ({})", m);
+            log.debug("Sending message: ({})", m);
 
             subscriber.message(m);
 
@@ -132,15 +135,51 @@ public class HubClient implements IStandardClient {
         try {
 
             switch (cmd[1]) {
+
                 case "accesspoints":
+                    if (cmd.length > 2) {
+                        switch (cmd[2]) {
+                            case "active":
+                            switch (jettyRequest.getMethod()) {
+                                case GET:
+                                    sendContentMessage(response, nwmProvider.getActiveAccessPoints(), HttpStatus.OK_200);
+                                    break;
+                                default:
+                                    log.error("Unknown method");
+                            }
+                            break;
+                            case "connect":
+                            switch (jettyRequest.getMethod()) {
+                                case GET:
+                                    sendContentMessage(response, nwmProvider.connectedWifi(), HttpStatus.OK_200);
+                                    break;
+                                default:
+                                    log.error("Unknown method");
+                            }
+                            break;
+                            case "disconnect":
+                            switch (jettyRequest.getMethod()) {
+                                case PUT:
+                                    sendContentMessage(response, nwmProvider.disconnectWifi(), HttpStatus.OK_200);
+                                    break;
+                                default:
+                                    log.error("Unknown method");
+                            }
+                            break;
+
+                            default:
+                             log.error("AccessPoint - Unknown command {}",cmd[2]);
+                        }
+                    }
                     switch (jettyRequest.getMethod()) {
                         case GET:
-                            sendContentMessage(response, nwmProvider.getWireless().getAPs(), HttpStatus.OK_200);
+                            sendContentMessage(response, nwmProvider.getAccessPoints(), HttpStatus.OK_200);
                             break;
                         case PUT:
                             String ap = jettyRequest.getBody().get("accesspoint").asText();
                             String pw = jettyRequest.getBody().get("secret").asText();
-                            sendContentMessage(response, nwmProvider.connectToAP(ap, pw), HttpStatus.OK_200);
+                            Object res = nwmProvider.connectToAP(ap, pw);
+                            sendContentMessage(response, res, res != null ? HttpStatus.OK_200 : HttpStatus.UNAUTHORIZED_401);
                             break;
                         default:
                             log.error("Unknown method");
@@ -151,7 +190,7 @@ public class HubClient implements IStandardClient {
                         case GET:
                             List<ZmartConnection> connections = new ArrayList<ZmartConnection>();
                             nwmProvider.listConnections().forEach(conn -> {
-                                NWMConnection connection = new NWMConnection(nwmProvider, conn.getObjectPath());
+                                INWMConnection connection = new NWMConnection(nwmProvider, conn.getObjectPath());
                                 connections.add(new ZmartConnection(conn.getObjectPath(),
                                         connection.getConnection().GetSettings()));
                             });
@@ -172,6 +211,27 @@ public class HubClient implements IStandardClient {
         }
 
         log.info("HubClient got request : {}", jettyRequest.getUri().getPath());
+    }
+
+    public String getMachineSerialNumber() {
+        String serialnum = null;
+        try {
+        Process process = Runtime.getRuntime().exec(new String[]{"cat","/proc/cpuinfo"});
+        process.getOutputStream().close();
+        Scanner sc = new Scanner(process.getInputStream());
+        while (sc.hasNext()) {
+            if (sc.next().equals("Serial")) {
+                sc.next();
+                serialnum = sc.next();
+                break;
+            }
+        }
+        sc.close();
+        }
+        catch (Exception e) {
+            log.error("Error getting serial number :: {}", e.getMessage());
+        }
+        return serialnum;
     }
 
     /*

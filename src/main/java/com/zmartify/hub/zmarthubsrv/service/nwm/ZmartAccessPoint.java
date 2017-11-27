@@ -29,5 +29,4 @@ public class ZmartAccessPoint {
     public Map<String, Variant<?>> getProperties() {
         return properties;
     }
-
 }

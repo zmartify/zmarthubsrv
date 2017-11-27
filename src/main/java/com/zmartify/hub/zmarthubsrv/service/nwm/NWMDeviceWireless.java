@@ -167,7 +167,7 @@ public class NWMDeviceWireless implements INWMDeviceWireless {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("Properties changed for DeviceWireless " + propertiesChanged);
+                log.debug("Properties changed for DeviceWireless " + propertiesChanged);
             }
         };
         new Thread(run).start();
@@ -184,7 +184,7 @@ public class NWMDeviceWireless implements INWMDeviceWireless {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("AccessPoint added for DeviceWireless " + accessPointAdded);
+                log.debug("AccessPoint added for DeviceWireless " + accessPointAdded);
             }
         };
         new Thread(run).start();
@@ -201,7 +201,7 @@ public class NWMDeviceWireless implements INWMDeviceWireless {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("AccessPoint removed for DeviceWireless " + accessPointRemoved);
+                log.debug("AccessPoint removed for DeviceWireless " + accessPointRemoved);
             }
         };
         new Thread(run).start();
@@ -217,7 +217,7 @@ public class NWMDeviceWireless implements INWMDeviceWireless {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("ScanDone for DeviceWireless " + scanDone);
+                log.debug("ScanDone for DeviceWireless " + scanDone);
             }
         };
         new Thread(run).start();
@@ -327,9 +327,21 @@ public class NWMDeviceWireless implements INWMDeviceWireless {
      */
     @Override
     public List<ZmartAccessPoint> getAPs() {
+
         List<ZmartAccessPoint> aps = new ArrayList<ZmartAccessPoint>();
-        getAllAccessPoints().forEach(ap -> {
-            aps.add(getAP(ap.getObjectPath()));
+        getAllAccessPoints().forEach(accessPoint -> {
+            aps.add(getAP(accessPoint.getObjectPath()));
+        });
+        return aps;
+    }
+
+    @Override
+    public List<ZmartAccessPoint> getActiveAPs() {
+        List<ZmartAccessPoint> aps = new ArrayList<ZmartAccessPoint>();
+        // Find any Active Wifi connections
+        nwmProvider.getActiveConnections().forEach(activeConn -> {
+            INWMConnectionActive activeConnection = new NWMConnectionActive(nwmProvider, activeConn.getPath());
+            aps.add(getAP(activeConnection.getSpecificObject().getPath()));
         });
         return aps;
     }

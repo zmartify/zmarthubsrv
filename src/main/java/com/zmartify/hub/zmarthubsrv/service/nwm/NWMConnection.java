@@ -59,16 +59,16 @@ public class NWMConnection implements INWMConnection {
 
             nwmConnection = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, connectionObjectPath,
                     NetworkManager.Settings.Connection.class);
-            log.info("Got connection '{}'", nwmConnection);
+            log.debug("Got connection '{}'", nwmConnection);
 
             nwmConnectionProperties = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, connectionObjectPath,
                     Properties.class);
-            log.info("Got connection.Properties '{}'", nwmConnectionProperties);
+            log.debug("Got connection.Properties '{}'", nwmConnectionProperties);
 
             nwmConnectionSettings = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, connectionObjectPath,
                     NetworkManager.Settings.class);
 
-            log.info("Got connection.Settings '{}'", nwmConnectionSettings);
+            log.debug("Got connection.Settings '{}'", nwmConnectionSettings);
 
         } catch (DBusException e) {
             log.error("Error constructing Connectin");
@@ -109,6 +109,7 @@ public class NWMConnection implements INWMConnection {
                 nwmProvider.getNWMDbusBusName(), nwmConnectionProperties, propertiesChangedSignalHandler);
 
         log.debug("Added connection sigHandler.PropertiesChanged ");
+
         /*
          * Setup propertiesChanged Signal Handler
          */
@@ -148,7 +149,7 @@ public class NWMConnection implements INWMConnection {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("Properties changed for Connection {}", propertiesChanged.properties);
+                log.debug("Properties changed for Connection {}", propertiesChanged.properties);
             }
         };
         new Thread(run).start();
@@ -164,7 +165,7 @@ public class NWMConnection implements INWMConnection {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("Connection updated {}", updated);
+                log.debug("Connection updated {}", updated);
             }
         };
         new Thread(run).start();
@@ -180,7 +181,7 @@ public class NWMConnection implements INWMConnection {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("Connection removed: {}", removed);
+                log.debug("Connection removed: {}", removed);
             }
         };
         new Thread(run).start();

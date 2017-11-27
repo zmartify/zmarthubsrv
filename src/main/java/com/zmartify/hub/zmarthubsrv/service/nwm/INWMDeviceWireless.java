@@ -45,6 +45,8 @@ public interface INWMDeviceWireless {
 
     List<ZmartAccessPoint> getAPs();
 
+    List<ZmartAccessPoint> getActiveAPs();
+
     Path getActiveAccessPoint();
 
     UInt32 getWirelessCapabilities();

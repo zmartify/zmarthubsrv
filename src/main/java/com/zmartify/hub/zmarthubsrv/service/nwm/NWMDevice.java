@@ -17,6 +17,7 @@ import org.freedesktop.dbus.DBusInterface;
 import org.freedesktop.dbus.DBusSigHandler;
 import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
+import org.freedesktop.dbus.exceptions.DBusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,8 @@ public class NWMDevice implements INWMDevice {
 
     private INWMProvider nwmProvider;
 
+    private boolean withSigHandlers = false;
+
     /**
      * The signal handler for changing properties.
      */
@@ -53,7 +56,10 @@ public class NWMDevice implements INWMDevice {
     }
 
     @Override
-    public void startup() throws Exception {
+    public void startup(boolean withSigHandlers) throws DBusException {
+
+        this.withSigHandlers = withSigHandlers;
+
         DBusConnection dbusConnection = nwmProvider.getDbusConnection();
 
         nwmDevice = dbusConnection.getRemoteObject(DBUS_NETWORKMANAGER, deviceObjectPath, Device.class);
@@ -64,6 +70,17 @@ public class NWMDevice implements INWMDevice {
 
         log.debug("Got device.Properties '{}'", nwmDeviceProperties);
 
+        if (withSigHandlers) addSigHandlers();
+
+    }
+
+    @Override
+    public void shutdown() throws DBusException {
+        if (withSigHandlers) removeSigHandlers();
+        withSigHandlers = false;
+    }
+
+    private void addSigHandlers() throws DBusException {
         stateChangedSignalHandler = new DBusSigHandler<NetworkManager.Device.StateChanged>() {
             @Override
             public void handle(NetworkManager.Device.StateChanged stateChanged) {
@@ -71,16 +88,15 @@ public class NWMDevice implements INWMDevice {
             }
         };
 
-        dbusConnection.addSigHandler(NetworkManager.Device.StateChanged.class, nwmProvider.getNWMDbusBusName(),
+        nwmProvider.getDbusConnection().addSigHandler(NetworkManager.Device.StateChanged.class, nwmProvider.getNWMDbusBusName(),
                 nwmDeviceProperties, stateChangedSignalHandler);
 
         log.debug("Added Device sigHandler.StateChanged ");
     }
 
-    @Override
-    public void shutdown() throws Exception {
-        nwmProvider.getDbusConnection().removeSigHandler(NetworkManager.Device.StateChanged.class,
-                stateChangedSignalHandler);
+    private void removeSigHandlers() throws DBusException {
+    nwmProvider.getDbusConnection().removeSigHandler(NetworkManager.Device.StateChanged.class,
+    stateChangedSignalHandler);
     }
 
     /**
@@ -93,12 +109,16 @@ public class NWMDevice implements INWMDevice {
         Runnable run = new Runnable() {
             @Override
             public void run() {
-                log.info("State changed for Device ", stateChanged);
+                log.debug("State changed for Device ", stateChanged);
             }
         };
         new Thread(run).start();
     }
 
+    @Override
+    public NetworkManager.Device getDevice() {
+        return nwmDevice;
+    }
     /*
      * (non-Javadoc)
      * 
@@ -175,7 +195,7 @@ public class NWMDevice implements INWMDevice {
      * @see com.zmartify.hub.zmartbtserver.service.nwm.INWMDevice#Real()
      */
     @Override
-    public boolean Real() {
+    public boolean getReal() {
         Variant<Boolean> value = nwmDeviceProperties.Get(NWM_DEVICE_INTERFACE, "Real");
         return value.getValue();
     }

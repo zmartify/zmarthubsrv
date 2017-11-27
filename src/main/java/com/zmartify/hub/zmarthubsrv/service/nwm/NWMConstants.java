@@ -37,9 +37,31 @@ public class NWMConstants {
      * The NetworkManager DBus interface for Connection.
      */
     static final String NWM_CONNECTION_INTERFACE = "org.freedesktop.NetworkManager.Settings.Connection";
-
+    
     static final String NWM_CONNECTION_UNSAVED = "Unsaved";
+    
+    /**
+     * The NetworkManager DBus interface for Connection.
+     */
+    static final String NWM_CONNECTIONACTIVE_INTERFACE = "org.freedesktop.NetworkManager.Connection.Active";
 
+    static final String NWM_CONNECTIONACTIVE_CONNECTION = "Connection";
+    static final String NWM_CONNECTIONACTIVE_SPECIFICOBJECT = "SpecificObject";
+    static final String NWM_CONNECTIONACTIVE_ID = "Id";
+    static final String NWM_CONNECTIONACTIVE_UUID = "Uuid";
+    static final String NWM_CONNECTIONACTIVE_TYPE = "Type";
+    static final String NWM_CONNECTIONACTIVE_DEVICES = "Devices";
+    static final String NWM_CONNECTIONACTIVE_STATE = "State";
+    static final String NWM_CONNECTIONACTIVE_STATEFLAGS = "StateFlags";
+    static final String NWM_CONNECTIONACTIVE_DEFAULT = "Default";
+    static final String NWM_CONNECTIONACTIVE_IP4CONFIG = "Ip4Config";
+    static final String NWM_CONNECTIONACTIVE_DHCP4CONFIG = "Dhcp4Config";
+    static final String NWM_CONNECTIONACTIVE_DEFAULT6 = "Default6";
+    static final String NWM_CONNECTIONACTIVE_IP6CONFIG = "Ip6Config";
+    static final String NWM_CONNECTIONACTIVE_DHCP6CONFIG = "Dhcp6Config";
+    static final String NWM_CONNECTIONACTIVE_VPN = "Vpn";
+    static final String NWM_CONNECTIONACTIVE_MASTER = "Master";
+    
     /**
      * The NetworkManager DBus interface for Device.
      */
@@ -63,6 +85,7 @@ public class NWMConstants {
     static final String NWM_PROPERTY_PRIMARYCONNECTION = "PrimaryConnection";
     static final String NWM_PROPERTY_PRIMARYCONNECTIONTYPE = "PrimayConnectionType";
     static final String NWM_PROPERTY_METERED = "Metered";
+    static final String NWM_PROPERTY_MANAGED = "Managed";
     static final String NWM_PROPERTY_ACTIVATINGCONNECTION = "ActivatingConnection";
     static final String NWM_PROPERTY_STARTUP = "Startup";
     static final String NWM_PROPERTY_VERSION = "Metered";
